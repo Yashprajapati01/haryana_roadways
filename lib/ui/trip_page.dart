@@ -47,6 +47,8 @@ class _TripPageState extends State<TripPage> {
   late final OnBusTracker _tracker = widget.tracker ?? OnBusTracker();
   final _table = CellTable();
   final _loadedCells = <CellKey>{};
+  final _remote = <CellKey, TowerPlace>{};
+  final _missed = <CellKey>{};
 
   List<RouteStop> _stops = const [];
   bool _loading = true;
@@ -214,6 +216,8 @@ class _TripPageState extends State<TripPage> {
           noticeText: copy.sharingHint,
           cells: _cells,
         );
+      } else {
+        await _cells.allowRead();
       }
       if (!mounted) return;
       setState(() {
@@ -241,7 +245,8 @@ class _TripPageState extends State<TripPage> {
   /// GPS mode. A good fix also teaches the current tower, but the dot stays on GPS.
   Future<void> _onGps(Position position) async {
     if (_mode != ShareMode.gps) return;
-    final cell = await _cells.serving();
+    final serving = await _cells.serving();
+    final cell = serving?.key;
     if (cell != null) await _remember(cell);
     SnapHit? hit;
     final lat = position.latitude;
@@ -270,24 +275,37 @@ class _TripPageState extends State<TripPage> {
     await _tick();
   }
 
-  /// Tower mode. No GPS stream. A tower only places the bus after a GPS ride taught it.
+  /// Tower mode. No GPS stream. The area code and cell id are looked up for an approximate point.
   Future<void> _onTower() async {
     if (_mode != ShareMode.tower || !_onBus) return;
-    final cell = await _cells.serving();
+    final copy = LocaleHost.copyOf(context);
+    final serving = await _cells.serving();
+    final cell = serving?.key;
     if (cell != null) await _remember(cell);
     SnapHit? hit;
     var lat = 0.0;
     var lng = 0.0;
-    final tower = cell == null ? null : _table.locate(cell);
-    if (tower != null) {
-      hit = snapToRoute(_stops, tower.lat, tower.lng, maxCrossTrackM: cellCrossTrackM);
-      lat = tower.lat;
-      lng = tower.lng;
+    var notice = copy.towerHidden;
+    final learned = cell == null ? null : _table.locate(cell);
+    if (learned != null) {
+      hit = snapToRoute(_stops, learned.lat, learned.lng, maxCrossTrackM: cellCrossTrackM);
+      lat = learned.lat;
+      lng = learned.lng;
+      notice = copy.towerUnknown;
+    } else if (cell != null) {
+      notice = copy.towerUnknown;
+      final place = await _approximate(cell, serving!.radio);
+      if (place != null) {
+        final limit = place.range.clamp(cellCrossTrackM, 8000.0);
+        hit = snapToRoute(_stops, place.lat, place.lng, maxCrossTrackM: limit);
+        lat = place.lat;
+        lng = place.lng;
+      }
     }
     if (!mounted || _mode != ShareMode.tower || !_onBus) return;
     setState(() {
       _own = hit;
-      _notice = hit == null ? LocaleHost.copyOf(context).towerUnknown : null;
+      _notice = hit == null ? notice : null;
     });
     if (hit == null || _clientId.isEmpty) return;
     await _live.upload(
@@ -301,6 +319,20 @@ class _TripPageState extends State<TripPage> {
       confirmed: true,
     );
     await _tick();
+  }
+
+  Future<TowerPlace?> _approximate(CellKey cell, String radio) async {
+    final cached = _remote[cell];
+    if (cached != null) return cached;
+    if (_missed.contains(cell)) return null;
+    final place = await _live.tower(cell, radio: radio);
+    if (!mounted) return place;
+    if (place == null) {
+      _missed.add(cell);
+    } else {
+      _remote[cell] = place;
+    }
+    return place;
   }
 
   Future<void> _remember(CellKey key) async {

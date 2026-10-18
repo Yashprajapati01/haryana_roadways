@@ -2,6 +2,16 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'cell_table.dart';
+
+class TowerPlace {
+  const TowerPlace({required this.lat, required this.lng, required this.range});
+
+  final double lat;
+  final double lng;
+  final double range;
+}
+
 class SeenFix {
   const SeenFix({
     required this.distanceM,
@@ -68,6 +78,35 @@ class LiveClient {
   Future<SeenFix?> position(int dutyId, String date) async {
     final look = await this.look(dutyId, date);
     return look.fix;
+  }
+
+  /// Approximate place for a tower. Null when this cell is unknown or the lookup failed.
+  Future<TowerPlace?> tower(CellKey key, {String radio = ''}) async {
+    try {
+      final response = await _client
+          .get(
+            Uri.parse('$base/cells').replace(
+              queryParameters: {
+                'mcc': '${key.mcc}',
+                'mnc': '${key.mnc}',
+                'lac': '${key.lac}',
+                'cid': '${key.cid}',
+                if (radio.isNotEmpty) 'radio': radio,
+              },
+            ),
+          )
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return null;
+      final body = jsonDecode(response.body);
+      if (body is! Map || body['status'] != 'seen') return null;
+      return TowerPlace(
+        lat: (body['lat'] as num).toDouble(),
+        lng: (body['lng'] as num).toDouble(),
+        range: (body['range'] as num).toDouble(),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   /// [reached] is false when this phone cannot ask the live server.

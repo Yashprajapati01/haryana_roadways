@@ -80,7 +80,7 @@ class MainActivity : FlutterActivity() {
         private const val notificationRequest = 41
     }
 
-    private fun servingCell(): Map<String, Int>? {
+    private fun servingCell(): Map<String, Any>? {
         val tm = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
         val info = try {
             tm.allCellInfo?.firstOrNull { it.isRegistered }
@@ -88,15 +88,26 @@ class MainActivity : FlutterActivity() {
             null
         } ?: return null
         return when (info) {
-            is CellInfoLte -> lte(info.cellIdentity)
-            is CellInfoGsm -> gsm(info.cellIdentity)
-            is CellInfoWcdma -> wcdma(info.cellIdentity)
+            is CellInfoLte -> withRadio(lte(info.cellIdentity), "LTE")
+            is CellInfoGsm -> withRadio(gsm(info.cellIdentity), "GSM")
+            is CellInfoWcdma -> withRadio(wcdma(info.cellIdentity), "UMTS")
             else -> if (Build.VERSION.SDK_INT >= 29 && info is CellInfoNr) {
-                nr(info.cellIdentity as CellIdentityNr)
+                withRadio(nr(info.cellIdentity as CellIdentityNr), "NR")
             } else {
                 null
             }
         }
+    }
+
+    private fun withRadio(ids: Map<String, Int>?, radio: String): Map<String, Any>? {
+        if (ids == null) return null
+        return mapOf(
+            "mcc" to ids.getValue("mcc"),
+            "mnc" to ids.getValue("mnc"),
+            "lac" to ids.getValue("lac"),
+            "cid" to ids.getValue("cid"),
+            "radio" to radio,
+        )
     }
 
     private fun lte(id: CellIdentityLte): Map<String, Int>? {

@@ -24,7 +24,16 @@ class CellReader {
     } catch (_) {}
   }
 
-  Future<CellKey?> serving() async {
+  /// Asks Android for permission to read the tower id. Does not turn GPS on.
+  Future<void> allowRead() async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      await Geolocator.requestPermission();
+    }
+  }
+
+  Future<ServingCell?> serving() async {
     if (kIsWeb || !Platform.isAndroid) return null;
     try {
       final raw = await _channel.invokeMapMethod<Object?, Object?>('servingCell');
@@ -35,7 +44,11 @@ class CellReader {
       final cid = _asInt(raw['cid']);
       if (mcc == null || mnc == null || lac == null || cid == null) return null;
       if (mcc <= 0 || mnc < 0 || lac < 0 || cid < 0) return null;
-      return CellKey(mcc: mcc, mnc: mnc, lac: lac, cid: cid);
+      final radio = raw['radio'];
+      return ServingCell(
+        CellKey(mcc: mcc, mnc: mnc, lac: lac, cid: cid),
+        radio is String ? radio : '',
+      );
     } catch (_) {
       return null;
     }

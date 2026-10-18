@@ -65,8 +65,10 @@ class Copy {
   String get sharingGps => hindi ? 'जीपीएस से भेज रहे हैं' : 'Sharing with GPS';
   String get sharingTower => hindi ? 'टॉवर से भेज रहे हैं' : 'Sharing with tower';
   String get towerUnknown => hindi
-      ? 'यह टॉवर अभी पता नहीं। इस रास्ते पर एक जीपीएस यात्रा इसे सिखाती है।'
-      : 'This tower is not known yet. A GPS ride on this stretch teaches it.';
+      ? 'इस टॉवर की अनुमानित जगह नहीं मिली।'
+      : 'No approximate place for this tower.';
+  String get towerHidden =>
+      hindi ? 'फ़ोन ने टॉवर की पहचान नहीं दी।' : 'The phone did not share this tower.';
   String get sharingHint =>
       hindi ? 'आपके फ़ोन से इस बस की जगह भेजी जा रही है' : 'Sharing this bus location from your phone';
   String get stopSharing => hindi ? 'रोकें' : 'Stop';

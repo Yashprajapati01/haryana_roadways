@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../cell_lookup.dart';
 import '../live_rule.dart';
 
 /// In-memory live bus positions. Restart clears them.
@@ -8,6 +9,7 @@ import '../live_rule.dart';
 /// must keep the last few minutes of rider points.
 Future<void> main() async {
   final observations = <Observation>[];
+  final towers = <String, CellPlace?>{};
   final port = int.tryParse(Platform.environment['PORT'] ?? '') ?? 8787;
   final server = await HttpServer.bind(InternetAddress.anyIPv4, port);
   stdout.writeln('live bus server on http://${server.address.address}:$port');
@@ -23,6 +25,8 @@ Future<void> main() async {
     try {
       if (request.method == 'POST' && request.uri.path == '/observations') {
         await _post(request, observations, now);
+      } else if (request.method == 'GET' && request.uri.path == '/cells') {
+        await _cell(request, towers);
       } else if (request.method == 'GET' &&
           (request.uri.path == '/' || request.uri.path == '/health')) {
         request.response.headers.contentType = ContentType.json;
@@ -65,6 +69,75 @@ Future<void> _post(HttpRequest request, List<Observation> observations, DateTime
     ),
   );
   request.response.statusCode = 204;
+}
+
+Future<void> _cell(HttpRequest request, Map<String, CellPlace?> towers) async {
+  final query = request.uri.queryParameters;
+  final mcc = int.tryParse(query['mcc'] ?? '');
+  final mnc = int.tryParse(query['mnc'] ?? '');
+  final lac = int.tryParse(query['lac'] ?? '');
+  final cid = int.tryParse(query['cid'] ?? '');
+  final radio = query['radio'] ?? '';
+  if (mcc == null || mnc == null || lac == null || cid == null) {
+    request.response.statusCode = 400;
+    request.response.write('bad cell');
+    return;
+  }
+  final apiKey = Platform.environment['OPENCELLID_KEY'] ?? '';
+  request.response.headers.contentType = ContentType.json;
+  if (apiKey.isEmpty) {
+    request.response.statusCode = 503;
+    request.response.write(jsonEncode({'status': 'unconfigured'}));
+    return;
+  }
+  final id = '$mcc:$mnc:$lac:$cid:$radio';
+  CellPlace? place;
+  if (towers.containsKey(id)) {
+    place = towers[id];
+  } else {
+    try {
+      place = await _openCell(apiKey, mcc: mcc, mnc: mnc, lac: lac, cid: cid, radio: radio);
+      towers[id] = place;
+    } catch (_) {
+      place = null;
+    }
+  }
+  if (place == null) {
+    request.response.write(jsonEncode({'status': 'none'}));
+    return;
+  }
+  request.response.write(
+    jsonEncode({'status': 'seen', 'lat': place.lat, 'lng': place.lng, 'range': place.range}),
+  );
+}
+
+Future<CellPlace?> _openCell(
+  String apiKey, {
+  required int mcc,
+  required int mnc,
+  required int lac,
+  required int cid,
+  required String radio,
+}) async {
+  final uri = Uri.https('opencellid.org', '/cell/get', {
+    'key': apiKey,
+    'mcc': '$mcc',
+    'mnc': '$mnc',
+    'lac': '$lac',
+    'cellid': '$cid',
+    if (radio == 'GSM' || radio == 'UMTS' || radio == 'LTE' || radio == 'NR') 'radio': radio,
+    'format': 'json',
+  });
+  final client = HttpClient();
+  try {
+    final request = await client.getUrl(uri);
+    final response = await request.close().timeout(const Duration(seconds: 8));
+    final raw = await utf8.decoder.bind(response).join();
+    if (response.statusCode != 200) throw StateError('upstream');
+    return parseOpenCell(jsonDecode(raw));
+  } finally {
+    client.close();
+  }
 }
 
 Future<void> _get(HttpRequest request, List<Observation> observations, DateTime now) async {

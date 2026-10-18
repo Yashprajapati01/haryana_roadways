@@ -1,3 +1,10 @@
+class ServingCell {
+  const ServingCell(this.key, this.radio);
+
+  final CellKey key;
+  final String radio;
+}
+
 class CellKey {
   const CellKey({
     required this.mcc,
