@@ -214,8 +214,6 @@ class _TripPageState extends State<TripPage> {
           noticeText: copy.sharingHint,
           cells: _cells,
         );
-      } else {
-        await _tracker.permit(_cells);
       }
       if (!mounted) return;
       setState(() {

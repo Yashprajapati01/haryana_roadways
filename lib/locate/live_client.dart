@@ -29,7 +29,7 @@ class LiveClient {
       base = base ??
           const String.fromEnvironment(
             'LIVE_BASE',
-            defaultValue: 'http://10.0.2.2:8787',
+            defaultValue: 'https://haryana-roadways.onrender.com',
           );
 
   final http.Client _client;

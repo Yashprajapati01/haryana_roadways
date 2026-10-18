@@ -19,7 +19,6 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private var locationReply: io.flutter.plugin.common.MethodChannel.Result? = null
     private var notificationReply: io.flutter.plugin.common.MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -28,7 +27,6 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "prepareTracking" -> result.success(true)
-                    "requestLocation" -> requestLocation(result)
                     "requestNotifications" -> requestNotifications(result)
                     "servingCell" -> result.success(servingCell())
                     else -> result.notImplemented()
@@ -42,28 +40,11 @@ class MainActivity : FlutterActivity() {
         grantResults: IntArray,
     ) {
         when (requestCode) {
-            locationRequest -> finish(locationReply, grantResults, Manifest.permission.ACCESS_FINE_LOCATION, permissions).also {
-                locationReply = null
-            }
             notificationRequest -> finish(notificationReply, grantResults, Manifest.permission.POST_NOTIFICATIONS, permissions).also {
                 notificationReply = null
             }
             else -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         }
-    }
-
-    private fun requestLocation(result: io.flutter.plugin.common.MethodChannel.Result) {
-        if (granted(Manifest.permission.ACCESS_FINE_LOCATION)) {
-            result.success(true)
-            return
-        }
-        locationReply?.success(false)
-        locationReply = result
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-            locationRequest,
-        )
     }
 
     private fun requestNotifications(result: io.flutter.plugin.common.MethodChannel.Result) {
@@ -96,7 +77,6 @@ class MainActivity : FlutterActivity() {
     }
 
     companion object {
-        private const val locationRequest = 42
         private const val notificationRequest = 41
     }
 

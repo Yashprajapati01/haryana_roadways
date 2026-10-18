@@ -3,9 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'copy.dart';
 import 'fa.dart';
 
-/// Transit-app rules: white page, one strong route blue, solid colour cards
-/// with very large times, pill buttons. Baloo 2 is one rounded family for
-/// Latin and Devanagari (Transit's Puffin has no Devanagari).
+/// Transit-app rules: one strong route blue, solid colour cards, large times.
+/// Light pages sit on a blue wash so white cards and fields read as surfaces.
+/// Dark pages stay near-black. Baloo 2 covers Latin and Devanagari.
 class AppTheme {
   static const brand = Color(0xFF1D4ED8);
   static const brandDeep = Color(0xFF1E3A8A);
@@ -21,10 +21,10 @@ class AppTheme {
       brightness == Brightness.light ? const Color(0xFFFFFFFF) : const Color(0xFF171A21);
 
   static Color field(Brightness brightness) =>
-      brightness == Brightness.light ? const Color(0xFFF3F4F6) : const Color(0xFF1F232B);
+      brightness == Brightness.light ? const Color(0xFFE7F0FF) : const Color(0xFF1F232B);
 
   static Color paper(Brightness brightness) =>
-      brightness == Brightness.light ? const Color(0xFFFFFFFF) : const Color(0xFF0F1115);
+      brightness == Brightness.light ? const Color(0xFFD9E6F8) : const Color(0xFF0F1115);
 
   static ThemeData _build(Brightness brightness) {
     final light = brightness == Brightness.light;
@@ -41,9 +41,9 @@ class AppTheme {
       onError: onColor,
       surface: paper(brightness),
       onSurface: ink,
-      onSurfaceVariant: light ? const Color(0xFF6B7280) : const Color(0xFF9CA3AF),
-      outline: light ? const Color(0xFFE5E7EB) : const Color(0xFF2A2F3A),
-      outlineVariant: light ? const Color(0xFFF3F4F6) : const Color(0xFF1F232B),
+      onSurfaceVariant: light ? const Color(0xFF3E5578) : const Color(0xFF9CA3AF),
+      outline: light ? const Color(0xFFC5D6EE) : const Color(0xFF2A2F3A),
+      outlineVariant: light ? const Color(0xFFD5E3F6) : const Color(0xFF1F232B),
     );
     final base = ThemeData(
       brightness: brightness,

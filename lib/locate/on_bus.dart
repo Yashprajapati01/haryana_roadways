@@ -17,17 +17,6 @@ class CellReader {
     } catch (_) {}
   }
 
-  /// System location dialog. True when fine location is allowed.
-  Future<bool> requestLocation() async {
-    if (kIsWeb || !Platform.isAndroid) return true;
-    try {
-      final ok = await _channel.invokeMethod<bool>('requestLocation');
-      return ok ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
   Future<void> requestNotifications() async {
     if (kIsWeb || !Platform.isAndroid) return;
     try {
@@ -70,27 +59,21 @@ class RideBlocked implements Exception {
 class OnBusTracker {
   StreamSubscription<Position>? _sub;
 
-  /// Asks the system for location. The GPS stream stays off until [start].
-  Future<void> permit(CellReader cells) async {
-    final serviceOn = await Geolocator.isLocationServiceEnabled();
-    if (!serviceOn) {
+  /// GPS only. Opens the system location switch when it is off, then the app permission.
+  Future<void> permit() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      await Geolocator.openLocationSettings();
       throw const RideBlocked(RideBlock.off);
-    }
-    if (!kIsWeb && Platform.isAndroid) {
-      final ok = await cells.requestLocation();
-      if (ok) return;
-      final status = await Geolocator.checkPermission();
-      if (status == LocationPermission.deniedForever) {
-        await Geolocator.openAppSettings();
-      }
-      throw const RideBlocked(RideBlock.denied);
     }
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
+    if (permission == LocationPermission.deniedForever) {
+      await Geolocator.openAppSettings();
+      throw const RideBlocked(RideBlock.denied);
+    }
+    if (permission == LocationPermission.denied) {
       throw const RideBlocked(RideBlock.denied);
     }
   }
@@ -101,7 +84,7 @@ class OnBusTracker {
     required String noticeText,
     required CellReader cells,
   }) async {
-    await permit(cells);
+    await permit();
     await cells.requestNotifications();
     await _sub?.cancel();
     _sub = Geolocator.getPositionStream(
